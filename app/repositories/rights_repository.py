@@ -12,6 +12,12 @@ class RightsRepository:
     """Persistence operations for Rights records."""
 
     @staticmethod
+    def get_by_id(session: Session, record_id: str) -> Optional[RightsRecord]:
+        """Fetch rights clearance record by primary key."""
+        stmt = select(RightsRecord).where(RightsRecord.id == record_id)
+        return session.execute(stmt).scalar_one_or_none()
+
+    @staticmethod
     def get_by_source_id(session: Session, source_id: str) -> Optional[RightsRecord]:
         """Fetch rights clearance record for a source."""
         stmt = select(RightsRecord).where(RightsRecord.source_id == source_id)

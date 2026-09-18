@@ -88,3 +88,147 @@ def test_legacy_class_code_mapping():
     assert SourceClass.from_legacy_code("CLASS_D") == SourceClass.PERMISSION_BASED
     assert SourceClass.from_legacy_code("CLASS_E") == SourceClass.UNKNOWN
     assert SourceClass.from_legacy_code("INVALID") == SourceClass.UNKNOWN
+
+
+def test_user_owned_with_explicit_evidence():
+    """User-owned material with explicit evidence records reference."""
+    res = evaluate_rights(
+        source_class=SourceClass.USER_OWNED,
+        license_type=LicenseType.OWNED,
+        evidence_reference="DOCS/ORIGINAL_CREATOR_AFFIDAVIT.PDF",
+    )
+    assert res.status == RightsStatus.APPROVED
+    assert "ORIGINAL_CREATOR_AFFIDAVIT" in res.decision_reason
+    assert not res.requires_human_review
+
+
+def test_commercial_license_incompatibilities():
+    """Commercial license with commercial_use=False or modification_allowed=False must be BLOCKED."""
+    # Disallows commercial use
+    res_no_comm = evaluate_rights(
+        source_class=SourceClass.COMMERCIAL_LICENSE,
+        license_type=LicenseType.COMMERCIAL,
+        commercial_use=False,
+        modification_allowed=True,
+        evidence_reference="INV-1234",
+    )
+    assert res_no_comm.status == RightsStatus.BLOCKED
+    assert res_no_comm.requires_human_review is True
+
+    # Disallows modification
+    res_no_mod = evaluate_rights(
+        source_class=SourceClass.COMMERCIAL_LICENSE,
+        license_type=LicenseType.COMMERCIAL,
+        commercial_use=True,
+        modification_allowed=False,
+        evidence_reference="INV-1234",
+    )
+    assert res_no_mod.status == RightsStatus.BLOCKED
+    assert res_no_mod.requires_human_review is True
+
+
+def test_creative_commons_cc0_policy():
+    """CC0 dedication allows reuse without attribution by default."""
+    res_unconditional = evaluate_rights(
+        source_class=SourceClass.CREATIVE_COMMONS,
+        license_type=LicenseType.CC0,
+        attribution_required=False,
+        evidence_reference="https://creativecommons.org/publicdomain/zero/1.0/",
+    )
+    assert res_unconditional.status == RightsStatus.APPROVED
+    assert not res_unconditional.attribution_required
+    assert res_unconditional.conditions == ()
+
+    # If policy requires attribution condition
+    res_conditional = evaluate_rights(
+        source_class=SourceClass.CREATIVE_COMMONS,
+        license_type=LicenseType.CC0,
+        attribution_required=True,
+        evidence_reference="https://creativecommons.org/publicdomain/zero/1.0/",
+    )
+    assert res_conditional.status == RightsStatus.CONDITIONAL
+    assert "attribution_required" in res_conditional.conditions
+
+
+def test_creative_commons_cc_by_sa_conditions():
+    """CC-BY-SA requires both attribution and share-alike conditions."""
+    res = evaluate_rights(
+        source_class=SourceClass.CREATIVE_COMMONS,
+        license_type=LicenseType.CC_BY_SA,
+        evidence_reference="https://creativecommons.org/licenses/by-sa/4.0/",
+        attribution_required=True,
+    )
+    assert res.status == RightsStatus.CONDITIONAL
+    assert "attribution_required" in res.conditions
+    assert "share_alike_required" in res.conditions
+    assert not res.requires_human_review
+
+
+def test_creative_commons_missing_evidence():
+    """Creative Commons without evidence requires human review."""
+    res = evaluate_rights(
+        source_class=SourceClass.CREATIVE_COMMONS,
+        license_type=LicenseType.CC_BY,
+        evidence_reference=None,
+    )
+    assert res.status == RightsStatus.REVIEW_REQUIRED
+    assert res.requires_human_review is True
+
+
+def test_permission_based_evaluation_matrix():
+    """Permission-based material requires both evidence reference and reviewer."""
+    # Missing reviewer
+    res_no_reviewer = evaluate_rights(
+        source_class=SourceClass.PERMISSION_BASED,
+        license_type=LicenseType.COMMERCIAL,
+        evidence_reference="AGREEMENT-PDF-441",
+        reviewer=None,
+    )
+    assert res_no_reviewer.status == RightsStatus.REVIEW_REQUIRED
+
+    # Missing evidence
+    res_no_evidence = evaluate_rights(
+        source_class=SourceClass.PERMISSION_BASED,
+        license_type=LicenseType.COMMERCIAL,
+        evidence_reference=None,
+        reviewer="legal_lead",
+    )
+    assert res_no_evidence.status == RightsStatus.REVIEW_REQUIRED
+
+    # Prohibits commercial use
+    res_no_comm = evaluate_rights(
+        source_class=SourceClass.PERMISSION_BASED,
+        license_type=LicenseType.COMMERCIAL,
+        commercial_use=False,
+        modification_allowed=True,
+        evidence_reference="AGREEMENT-PDF-441",
+        reviewer="legal_lead",
+    )
+    assert res_no_comm.status == RightsStatus.BLOCKED
+
+    # Valid with attribution
+    res_valid_attr = evaluate_rights(
+        source_class=SourceClass.PERMISSION_BASED,
+        license_type=LicenseType.COMMERCIAL,
+        commercial_use=True,
+        modification_allowed=True,
+        attribution_required=True,
+        evidence_reference="AGREEMENT-PDF-441",
+        reviewer="legal_lead",
+    )
+    assert res_valid_attr.status == RightsStatus.CONDITIONAL
+    assert "attribution_required" in res_valid_attr.conditions
+
+    # Valid without attribution
+    res_valid_no_attr = evaluate_rights(
+        source_class=SourceClass.PERMISSION_BASED,
+        license_type=LicenseType.COMMERCIAL,
+        commercial_use=True,
+        modification_allowed=True,
+        attribution_required=False,
+        evidence_reference="AGREEMENT-PDF-441",
+        reviewer="legal_lead",
+    )
+    assert res_valid_no_attr.status == RightsStatus.APPROVED
+    assert res_valid_no_attr.conditions == ()
+    assert "legal_lead" in res_valid_no_attr.decision_reason

@@ -4,9 +4,9 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.errors import NotFoundError, StateTransitionError
 from app.core.logging import get_logger
-from app.domain.enums import WorkflowState
+from app.domain.enums import RightsStatus, WorkflowState
 from app.domain.state_machine import validate_transition
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.project_repository import ProjectRepository
@@ -37,7 +37,16 @@ class WorkflowService:
 
         current_state = source.workflow_state
 
-        # 1. Validate transition through domain state machine
+        # 1. Hard Rights Gate: Unapproved sources can never enter TRANSCRIBING
+        if requested_state == WorkflowState.TRANSCRIBING and source.rights_status != RightsStatus.APPROVED:
+            raise StateTransitionError(
+                current_state.value,
+                requested_state.value,
+                f"Rights gate check failed: source '{source_id}' has rights_status={source.rights_status.value}. "
+                "Unrestricted downstream processing requires APPROVED rights status.",
+            )
+
+        # 2. Validate transition through domain state machine
         validate_transition(current_state, requested_state, context={"source_id": source_id, "reason": reason})
 
         # 2. Mutate entity
