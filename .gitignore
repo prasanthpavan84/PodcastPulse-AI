@@ -1,0 +1,48 @@
+# Python & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Configuration & secrets
+.env
+*.local.env
+
+# Testing & linting caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local media storage (keep structure, exclude binaries)
+data/raw/*
+!data/raw/.gitkeep
+data/transcripts/*
+!data/transcripts/.gitkeep
+data/clips/*
+!data/clips/.gitkeep
+data/scripts/*
+!data/scripts/.gitkeep
+data/audio/*
+!data/audio/.gitkeep
+data/assets/*
+!data/assets/.gitkeep
+data/renders/*
+!data/renders/.gitkeep
+data/thumbnails/*
+!data/thumbnails/.gitkeep
+data/reports/*
+!data/reports/.gitkeep
+
+# IDEs & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
