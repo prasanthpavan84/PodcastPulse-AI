@@ -4,6 +4,7 @@ Ensures domain and application services remain strictly decoupled from third-par
 """
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
@@ -61,7 +62,11 @@ class YouTubeDiscovery(ABC):
         keywords: Optional[List[str]] = None,
         channels: Optional[List[str]] = None,
         min_views: int = 10000,
-        published_after_days: int = 30,
+        published_after_days: Optional[int] = 30,
+        published_after: Optional[datetime] = None,
+        published_before: Optional[datetime] = None,
+        max_results: int = 25,
+        max_queries: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Query external candidate videos."""
         pass

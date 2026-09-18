@@ -59,3 +59,4 @@ class Source(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     rights_record = relationship("RightsRecord", back_populates="source", uselist=False, cascade="all, delete-orphan")
     transcripts = relationship("Transcript", back_populates="source", cascade="all, delete-orphan")
     clip_candidates = relationship("ClipCandidate", back_populates="source", cascade="all, delete-orphan")
+    trend_scores = relationship("TrendScore", back_populates="source", cascade="all, delete-orphan")

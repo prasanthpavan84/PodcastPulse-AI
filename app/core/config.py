@@ -43,9 +43,12 @@ class Settings(BaseSettings):
     # Local storage & paths
     data_dir: Path = Field(default=Path("./data"), description="Base directory for local file storage")
 
-    # External tooling paths (Phase 0/1 verification only)
+    # External tooling paths & API Keys (Phase 2)
     ffmpeg_path: str = Field(default="ffmpeg", description="Path or command for FFmpeg executable")
     ollama_base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
+    youtube_api_key: str | None = Field(default=None, description="YouTube Data API v3 key")
+    discovery_max_results: int = Field(default=25, description="Default max results per YouTube search query")
+    discovery_max_queries_per_run: int = Field(default=5, description="Max queries executed per discovery run")
 
     # Logging & Observability
     log_level: str = Field(default="INFO", description="Standard logging level")

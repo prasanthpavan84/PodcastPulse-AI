@@ -74,9 +74,12 @@ class JobService:
             job.duration_seconds = (now - job.started_at).total_seconds()
 
         if result_metadata:
-            merged = job.metadata_json or {}
+            merged = dict(job.metadata_json or {})
             merged.update(result_metadata)
             job.metadata_json = merged
+            from sqlalchemy.orm.attributes import flag_modified
+
+            flag_modified(job, "metadata_json")
 
         JobRepository.save(session, job)
         logger.info("job_completed", job_id=job.id, duration_seconds=job.duration_seconds)

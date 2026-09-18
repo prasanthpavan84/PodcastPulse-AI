@@ -7,9 +7,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.adapters.mocks import MockYouTubeDiscovery
 from app.api.main import app
 from app.core.config import settings
 from app.database.models import Base
+from app.database.session import get_db
 
 # Dedicated MySQL 8 integration test engine
 test_engine = create_engine(
@@ -45,12 +47,29 @@ def mysql_session() -> Generator[Session, None, None]:
     yield session
 
     session.close()
-    transaction.rollback()
+    if transaction.is_active:
+        transaction.rollback()
     connection.close()
 
 
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
-    """FastAPI TestClient instance."""
+    """FastAPI TestClient instance configured to use MySQL 8 test database."""
+
+    def _test_get_db() -> Generator[Session, None, None]:
+        session = TestSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _test_get_db
     with TestClient(app) as test_client:
         yield test_client
+    app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def mock_youtube_adapter() -> MockYouTubeDiscovery:
+    """Fixture providing a fresh MockYouTubeDiscovery instance."""
+    return MockYouTubeDiscovery()

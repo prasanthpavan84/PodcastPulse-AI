@@ -3,6 +3,7 @@
 All outputs are clearly identified as MOCK in accordance with anti-fake engineering rules.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.adapters.interfaces import (
@@ -78,21 +79,34 @@ class MockYouTubeDiscovery(YouTubeDiscovery):
 
     is_mock: bool = True
 
+    def __init__(self, canned_candidates: Optional[List[Dict[str, Any]]] = None):
+        self.canned_candidates = canned_candidates
+
     def search_candidates(
         self,
         topics: List[str],
         keywords: Optional[List[str]] = None,
         channels: Optional[List[str]] = None,
         min_views: int = 10000,
-        published_after_days: int = 30,
+        published_after_days: Optional[int] = 30,
+        published_after: Optional[datetime] = None,
+        published_before: Optional[datetime] = None,
+        max_results: int = 25,
+        max_queries: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
+        if self.canned_candidates is not None:
+            return self.canned_candidates
+
         return [
             {
                 "mode": "MOCK",
                 "external_id": "mock_yt_001",
                 "platform": "youtube",
                 "title": f"MOCK: Discussion on {topics[0] if topics else 'AI'}",
+                "description": "A comprehensive synthetic discussion on technology trends.",
+                "channel_id": channels[0] if channels else "UC_mock_channel_101",
                 "channel_name": "AI Insights Podcast",
+                "thumbnail_url": "https://img.youtube.com/vi/mock_yt_001/hqdefault.jpg",
                 "views": 250000,
                 "likes": 12000,
                 "comments": 850,

@@ -15,6 +15,7 @@ from app.database.models.rights import RightsRecord
 from app.database.models.script import Script
 from app.database.models.source import Source
 from app.database.models.transcript import Transcript, TranscriptSegment
+from app.database.models.trend import TrendScore
 from app.database.models.user import User
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "User",
     "Channel",
     "Source",
+    "TrendScore",
     "RightsRecord",
     "Job",
     "Project",
