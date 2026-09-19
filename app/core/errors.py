@@ -114,3 +114,16 @@ class DatabaseError(AppError):
             details=details,
             retryable=retryable,
         )
+
+
+class RightsAuthorizationError(AppError):
+    """Raised when an unauthorized actor attempts a rights decision or rights mutation."""
+
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            code=ErrorCode.VALIDATION_ERROR,
+            message=message,
+            status_code=403,
+            details=details,
+            retryable=False,
+        )

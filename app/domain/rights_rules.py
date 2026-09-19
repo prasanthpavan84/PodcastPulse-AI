@@ -4,9 +4,20 @@ Pure domain module: zero external framework dependencies.
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional
 
-from app.domain.enums import LicenseType, RightsStatus, SourceClass
+from app.domain.enums import EvidenceStatus, LicenseType, ReviewerRole, RightsStatus, SourceClass
+
+
+@dataclass(frozen=True)
+class EvidenceValidationResult:
+    """Result of deterministic evidence verification."""
+
+    is_valid: bool
+    evidence_status: EvidenceStatus
+    errors: tuple[str, ...] = ()
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -19,6 +30,108 @@ class RightsEvaluationResult:
     attribution_required: bool
     conditions: tuple[str, ...] = ()
     ruleset_version: str = "1.0.0"
+
+
+def validate_evidence(
+    source_id: str,
+    target_source_id: str,
+    evidence_status: EvidenceStatus,
+    decision: RightsStatus,
+    evidence_reference: Optional[str] = None,
+    evidence_timestamp: Optional[datetime] = None,
+    expires_at: Optional[datetime] = None,
+    reviewer: Optional[str] = None,
+    reviewer_role: Optional[str] = None,
+    source_class: Optional[SourceClass] = None,
+    license_type: Optional[LicenseType] = None,
+    reference_time: Optional[datetime] = None,
+    project_id: Optional[str] = None,
+    target_project_id: Optional[str] = None,
+) -> EvidenceValidationResult:
+    """Deterministically validate evidence, reviewer authorization, bindings, and expiry.
+
+    Enforces:
+    1. Source binding: evidence tied to source_id must match target_source_id.
+    2. Project binding: evidence tied to project_id must match target_project_id when specified.
+    3. Expiry: expired evidence cannot approve or process.
+    4. Human authorization: reviewer identity and authorized human role required for approval; AI/LLM forbidden.
+    5. Creative Commons safety: label alone is insufficient; documented verification required.
+    6. Decision consistency: UNKNOWN, REJECTED, or EXPIRED evidence cannot produce APPROVED.
+    """
+    errors: list[str] = []
+    now = reference_time or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+
+    # 1. Source binding
+    if source_id != target_source_id:
+        errors.append(
+            f"Source mismatch: evidence is bound to source '{source_id}', cannot authorize target '{target_source_id}'."
+        )
+
+    # 2. Project binding
+    if project_id is not None and target_project_id is not None and project_id != target_project_id:
+        errors.append(
+            f"Project mismatch: evidence is bound to project '{project_id}', cannot authorize target '{target_project_id}'."
+        )
+
+    # 3. Expiration checks
+    effective_status = evidence_status
+    if expires_at is not None:
+        exp = expires_at if expires_at.tzinfo is not None else expires_at.replace(tzinfo=timezone.utc)
+        if exp <= now:
+            effective_status = EvidenceStatus.EXPIRED
+            errors.append(f"Evidence expired at {exp.isoformat()}. Current reference time is {now.isoformat()}.")
+    elif evidence_status == EvidenceStatus.EXPIRED:
+        errors.append("Evidence status is EXPIRED.")
+
+    # 4. Consistency with decision
+    if decision == RightsStatus.APPROVED:
+        if effective_status in {EvidenceStatus.UNKNOWN, EvidenceStatus.REJECTED, EvidenceStatus.EXPIRED}:
+            errors.append(f"Cannot grant APPROVED rights when evidence status is {effective_status.value}.")
+
+        # Human authorization requirement
+        if not reviewer or not reviewer.strip():
+            errors.append("Human authorization required: reviewer identifier is missing.")
+        elif not ReviewerRole.is_authorized_human(reviewer_role):
+            errors.append(
+                f"Unauthorized reviewer: role '{reviewer_role}' is not an authorized human reviewer role. "
+                "AI/automated systems are prohibited from creating final rights approvals."
+            )
+
+        # Creative Commons safety
+        if source_class == SourceClass.CREATIVE_COMMONS:
+            if effective_status != EvidenceStatus.CREATIVE_COMMONS_VERIFIED:
+                errors.append(
+                    "Creative Commons claims require documented verification producing CREATIVE_COMMONS_VERIFIED. "
+                    "Unverified platform labels cannot authorize rights approval."
+                )
+            if not evidence_reference or not evidence_reference.strip():
+                errors.append("Creative Commons verification requires documented evidence reference URL or document.")
+
+        # Permission-based safety
+        if source_class == SourceClass.PERMISSION_BASED:
+            if effective_status != EvidenceStatus.PERMISSION_GRANTED:
+                errors.append("Permission-based content requires documented consent producing PERMISSION_GRANTED.")
+            if not evidence_reference or not evidence_reference.strip():
+                errors.append("Permission-based content requires documented consent agreement reference.")
+
+        # Commercial license safety
+        if source_class == SourceClass.COMMERCIAL_LICENSE:
+            if effective_status != EvidenceStatus.LICENSED:
+                errors.append("Commercial license requires verified license evidence status LICENSED.")
+            if not evidence_reference or not evidence_reference.strip():
+                errors.append("Commercial license requires documented license contract or invoice reference.")
+
+    is_valid = len(errors) == 0
+    reason = "Evidence validation passed." if is_valid else "; ".join(errors)
+
+    return EvidenceValidationResult(
+        is_valid=is_valid,
+        evidence_status=effective_status,
+        errors=tuple(errors),
+        reason=reason,
+    )
 
 
 def evaluate_rights(

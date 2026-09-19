@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError, StateTransitionError
 from app.core.logging import get_logger
-from app.domain.enums import RightsStatus, WorkflowState
+from app.domain.enums import WorkflowState
 from app.domain.state_machine import validate_transition
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.project_repository import ProjectRepository
@@ -37,14 +37,18 @@ class WorkflowService:
 
         current_state = source.workflow_state
 
-        # 1. Hard Rights Gate: Unapproved sources can never enter TRANSCRIBING
-        if requested_state == WorkflowState.TRANSCRIBING and source.rights_status != RightsStatus.APPROVED:
-            raise StateTransitionError(
-                current_state.value,
-                requested_state.value,
-                f"Rights gate check failed: source '{source_id}' has rights_status={source.rights_status.value}. "
-                "Unrestricted downstream processing requires APPROVED rights status.",
-            )
+        # 1. Hard Rights Gate: Unapproved or invalid rights sources can never enter TRANSCRIBING
+        if requested_state == WorkflowState.TRANSCRIBING:
+            from app.services.rights_service import RightsService
+
+            try:
+                RightsService.validate_rights_gate(session, source_id=source_id)
+            except Exception as exc:
+                raise StateTransitionError(
+                    current_state.value,
+                    requested_state.value,
+                    f"Rights gate check failed: {str(exc)}",
+                ) from exc
 
         # 2. Validate transition through domain state machine
         validate_transition(current_state, requested_state, context={"source_id": source_id, "reason": reason})
@@ -100,6 +104,39 @@ class WorkflowService:
             raise NotFoundError("Project", project_id)
 
         current_state = project.state
+
+        # Enforce rights gate for downstream project processing states
+        downstream_processing_states = {
+            WorkflowState.TRANSCRIBING,
+            WorkflowState.TRANSCRIBED,
+            WorkflowState.CLIP_ANALYSIS,
+            WorkflowState.CLIPS_READY,
+            WorkflowState.SCRIPT_READY,
+            WorkflowState.VIDEO_RENDERING,
+            WorkflowState.RENDERED,
+            WorkflowState.QC_PENDING,
+            WorkflowState.QC_PASSED,
+            WorkflowState.REVIEW_PENDING,
+            WorkflowState.APPROVED,
+            WorkflowState.READY_TO_PUBLISH,
+            WorkflowState.UPLOADING,
+            WorkflowState.PUBLISHED,
+        }
+        if requested_state in downstream_processing_states:
+            from app.services.rights_service import RightsService
+
+            try:
+                RightsService.validate_rights_gate(
+                    session,
+                    source_id=project.source_id,
+                    target_project_id=project.id,
+                )
+            except Exception as exc:
+                raise StateTransitionError(
+                    current_state.value,
+                    requested_state.value,
+                    f"Rights gate check failed for project '{project_id}': {str(exc)}",
+                ) from exc
 
         # 1. Validate transition through domain state machine
         validate_transition(current_state, requested_state, context={"project_id": project_id, "reason": reason})

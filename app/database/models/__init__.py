@@ -7,6 +7,7 @@ from app.database.models.audit import AuditEvent
 from app.database.models.channel import Channel
 from app.database.models.clip import ClipCandidate, ClipScore
 from app.database.models.job import Job
+from app.database.models.popularity import PopularityScore
 from app.database.models.project import Project
 from app.database.models.publishing import PublishedVideo, PublishingJob
 from app.database.models.quality import QualityCheck
@@ -24,6 +25,7 @@ __all__ = [
     "Channel",
     "Source",
     "TrendScore",
+    "PopularityScore",
     "RightsRecord",
     "Job",
     "Project",

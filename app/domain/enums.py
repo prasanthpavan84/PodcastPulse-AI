@@ -117,3 +117,45 @@ class LicenseType(str, Enum):
     CC0 = "CC0"
     STANDARD_YOUTUBE = "STANDARD_YOUTUBE"
     UNKNOWN = "UNKNOWN"
+
+
+class EvidenceStatus(str, Enum):
+    """Lifecycle status of the rights evidence itself."""
+
+    OWNED = "OWNED"
+    LICENSED = "LICENSED"
+    CREATIVE_COMMONS_VERIFIED = "CREATIVE_COMMONS_VERIFIED"
+    PERMISSION_GRANTED = "PERMISSION_GRANTED"
+    UNKNOWN = "UNKNOWN"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
+
+class ReviewerRole(str, Enum):
+    """Authorized human reviewer roles vs automated systems."""
+
+    LEGAL_COUNSEL = "legal_counsel"
+    RIGHTS_REVIEWER = "rights_reviewer"
+    COMPLIANCE_OFFICER = "compliance_officer"
+    EDITOR = "editor"
+    ADMIN = "admin"
+
+    # Prohibited non-human / automated actors
+    AI_AGENT = "ai_agent"
+    LLM = "llm"
+    SYSTEM = "system"
+    AUTOMATED_JOB = "automated_job"
+
+    @classmethod
+    def is_authorized_human(cls, role: str | None) -> bool:
+        """Verify whether a role is an authorized human reviewer."""
+        if not role:
+            return False
+        human_roles = {
+            cls.LEGAL_COUNSEL.value,
+            cls.RIGHTS_REVIEWER.value,
+            cls.COMPLIANCE_OFFICER.value,
+            cls.EDITOR.value,
+            cls.ADMIN.value,
+        }
+        return role.lower() in human_roles

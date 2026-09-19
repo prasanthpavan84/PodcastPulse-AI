@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.domain.enums import LicenseType, RightsStatus, SourceClass
+from app.domain.enums import EvidenceStatus, LicenseType, RightsStatus, SourceClass
 
 
 class RightsRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -22,6 +22,12 @@ class RightsRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    project_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     source_class: Mapped[SourceClass] = mapped_column(
         Enum(SourceClass),
         default=SourceClass.UNKNOWN,
@@ -31,6 +37,12 @@ class RightsRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Enum(LicenseType),
         default=LicenseType.UNKNOWN,
         nullable=False,
+    )
+    evidence_status: Mapped[EvidenceStatus] = mapped_column(
+        Enum(EvidenceStatus),
+        default=EvidenceStatus.UNKNOWN,
+        nullable=False,
+        index=True,
     )
     commercial_use: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     modification_allowed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -51,3 +63,4 @@ class RightsRecord(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Relationships
     source = relationship("Source", back_populates="rights_record")
+    project = relationship("Project")
